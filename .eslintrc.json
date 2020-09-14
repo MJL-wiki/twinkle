@@ -1,17 +1,19 @@
 {
-	"extends": ["eslint:recommended"],
+	"plugins": ["es5"],
+	"extends": ["eslint:recommended", "plugin:es5/no-es2015"],
 	"root": true,
 	"env": {
 		"browser": true,
 		"jquery": true
 	},
 	"globals": {
-		"mw": true
+		"mw": "readonly"
 	},
 	"ignorePatterns": "select2*",
 	"rules": {
 		"no-console": "error",
 		"no-extra-parens": ["error", "all", { "nestedBinaryExpressions": false }],
+		"no-unreachable-loop": "error",
 		"block-scoped-var": "error",
 		"curly": "error",
 		"default-case": "error",

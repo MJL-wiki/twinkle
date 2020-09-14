@@ -696,49 +696,49 @@ Twinkle.speedy.articleList = [
 		}
 	},
 	{
-		label: 'A7: Unremarkable people, groups, companies, web content, individual animals, or organized events',
+		label: 'A7: No indication of importance (people, groups, companies, web content, individual animals, or organized events)',
 		value: 'a7',
 		tooltip: 'An article about a real person, group of people, band, club, company, web content, individual animal, tour, or party that does not assert the importance or significance of its subject. If controversial, or if a previous AfD has resulted in the article being kept, the article should be nominated for AfD instead',
 		hideWhenSingle: true
 	},
 	{
-		label: 'A7: Unremarkable person',
+		label: 'A7: No indication of importance (person)',
 		value: 'person',
 		tooltip: 'An article about a real person that does not assert the importance or significance of its subject. If controversial, or if there has been a previous AfD that resulted in the article being kept, the article should be nominated for AfD instead',
 		hideWhenMultiple: true
 	},
 	{
-		label: 'A7: Unremarkable musician(s) or band',
+		label: 'A7: No indication of importance (musician(s) or band)',
 		value: 'band',
 		tooltip: 'Article about a band, singer, musician, or musical ensemble that does not assert the importance or significance of the subject',
 		hideWhenMultiple: true
 	},
 	{
-		label: 'A7: Unremarkable club',
+		label: 'A7: No indication of importance (club, society or group)',
 		value: 'club',
-		tooltip: 'Article about a club that does not assert the importance or significance of the subject',
+		tooltip: 'Article about a club, society or group that does not assert the importance or significance of the subject',
 		hideWhenMultiple: true
 	},
 	{
-		label: 'A7: Unremarkable company or organization',
+		label: 'A7: No indication of importance (company or organization)',
 		value: 'corp',
 		tooltip: 'Article about a company or organization that does not assert the importance or significance of the subject',
 		hideWhenMultiple: true
 	},
 	{
-		label: 'A7: Unremarkable website or web content',
+		label: 'A7: No indication of importance (website or web content)',
 		value: 'web',
 		tooltip: 'Article about a web site, blog, online forum, webcomic, podcast, or similar web content that does not assert the importance or significance of its subject',
 		hideWhenMultiple: true
 	},
 	{
-		label: 'A7: Unremarkable individual animal',
+		label: 'A7: No indication of importance (individual animal)',
 		value: 'animal',
 		tooltip: 'Article about an individual animal (e.g. pet) that does not assert the importance or significance of its subject',
 		hideWhenMultiple: true
 	},
 	{
-		label: 'A7: Unremarkable organized event',
+		label: 'A7: No indication of importance (organized event)',
 		value: 'event',
 		tooltip: 'Article about an organized event (tour, function, meeting, party, etc.) that does not assert the importance or significance of its subject',
 		hideWhenMultiple: true
@@ -774,7 +774,13 @@ Twinkle.speedy.categoryList = [
 	{
 		label: 'G8: Categories populated by a deleted or retargeted template',
 		value: 'templatecat',
-		tooltip: 'This is for situations where a category is effectively empty, because the template(s) that formerly placed pages in that category are now deleted. This excludes categories that are still in use.'
+		tooltip: 'This is for situations where a category is effectively empty, because the template(s) that formerly placed pages in that category are now deleted. This excludes categories that are still in use.',
+		subgroup: {
+			name: 'templatecat_rationale',
+			type: 'input',
+			label: 'Optional explanation: ',
+			size: 60
+		}
 	},
 	{
 		label: 'G8: Redirects to non-existent targets',
@@ -832,18 +838,6 @@ Twinkle.speedy.userList = [
 ];
 
 Twinkle.speedy.templateList = [
-	{
-		label: 'T2: Templates that are blatant misrepresentations of established policy',
-		value: 'policy',
-		tooltip: 'This includes "speedy deletion" templates for issues that are not speedy deletion criteria and disclaimer templates intended to be used in articles',
-		subgroup: {
-			name: 'policy_rationale',
-			type: 'input',
-			label: 'Optional explanation: ',
-			size: 60
-		},
-		hideSubgroupWhenSysop: true
-	},
 	{
 		label: 'T3: Duplicate templates or hardcoded instances',
 		value: 'duplicatetemplate',
@@ -1162,7 +1156,6 @@ Twinkle.speedy.normalizeHash = {
 	'nouser': 'u2',
 	'gallery': 'u3',
 	'notwebhost': 'u5',
-	'policy': 't2',
 	'duplicatetemplate': 't3',
 	'p1': 'p1',
 	'emptyportal': 'p2'
@@ -1289,9 +1282,10 @@ Twinkle.speedy.callbacks = {
 			}
 
 			usertalkpage.setAppendText(notifytext);
-			usertalkpage.setEditSummary(editsummary + Twinkle.getPref('summaryAd'));
+			usertalkpage.setEditSummary(editsummary);
+			usertalkpage.setChangeTags(Twinkle.changeTags);
 			usertalkpage.setCreateOption('recreate');
-			usertalkpage.setFollowRedirect(true);
+			usertalkpage.setFollowRedirect(true, false);
 			usertalkpage.append(function onNotifySuccess() {
 				// add this nomination to the user's userspace log, if the user has enabled it
 				if (params.lognomination) {
@@ -1335,7 +1329,9 @@ Twinkle.speedy.callbacks = {
 			}
 
 			var deleteMain = function(callback) {
-				thispage.setEditSummary(reason + Twinkle.getPref('deletionSummaryAd'));
+				thispage.setEditSummary(reason);
+				thispage.setChangeTags(Twinkle.changeTags);
+				thispage.setWatchlist(params.watch);
 				thispage.deletePage(function() {
 					thispage.getStatusElement().info('done');
 					typeof callback === 'function' && callback();
@@ -1362,7 +1358,8 @@ Twinkle.speedy.callbacks = {
 					params.normalized !== 'f8' &&
 					document.getElementById('ca-talk').className !== 'new') {
 				var talkpage = new Morebits.wiki.page(mw.config.get('wgFormattedNamespaces')[mw.config.get('wgNamespaceNumber') + 1] + ':' + mw.config.get('wgTitle'), 'Deleting talk page');
-				talkpage.setEditSummary('[[WP:CSD#G8|G8]]: Talk page of deleted page "' + Morebits.pageNameNorm + '"' + Twinkle.getPref('deletionSummaryAd'));
+				talkpage.setEditSummary('[[WP:CSD#G8|G8]]: Talk page of deleted page "' + Morebits.pageNameNorm + '"');
+				talkpage.setChangeTags(Twinkle.changeTags);
 				talkpage.deletePage();
 				// this is ugly, but because of the architecture of wiki.api, it is needed
 				// (otherwise success/failure messages for the previous action would be suppressed)
@@ -1453,7 +1450,8 @@ Twinkle.speedy.callbacks = {
 			$snapshot.each(function(key, value) {
 				var title = $(value).attr('title');
 				var page = new Morebits.wiki.page(title, 'Deleting redirect "' + title + '"');
-				page.setEditSummary('[[WP:CSD#G8|G8]]: Redirect to deleted page "' + Morebits.pageNameNorm + '"' + Twinkle.getPref('deletionSummaryAd'));
+				page.setEditSummary('[[WP:CSD#G8|G8]]: Redirect to deleted page "' + Morebits.pageNameNorm + '"');
+				page.setChangeTags(Twinkle.changeTags);
 				page.deletePage(onsuccess);
 			});
 		}
@@ -1533,8 +1531,24 @@ Twinkle.speedy.callbacks = {
 				editsummary = 'Requesting speedy deletion ([[WP:CSD#' + params.normalizeds[0].toUpperCase() + '|CSD ' + params.normalizeds[0].toUpperCase() + ']]).';
 			}
 
-			pageobj.setPageText(code + (params.normalizeds.indexOf('g10') !== -1 ? '' : '\n' + text)); // cause attack pages to be blanked
-			pageobj.setEditSummary(editsummary + Twinkle.getPref('summaryAd'));
+			// Set the correct value for |ts= parameter in {{db-g13}}
+			if (params.normalizeds.indexOf('g13') !== -1) {
+				code = code.replace('$TIMESTAMP', pageobj.getLastEditTime());
+			}
+
+
+			// Blank attack pages
+			if (params.normalizeds.indexOf('g10') !== -1) {
+				text = code;
+			} else {
+				// Insert tag after short description or any hatnotes
+				var wikipage = new Morebits.wikitext.page(text);
+				text = wikipage.insertAfterTemplates(code + '\n', Twinkle.hatnoteRegex).getText();
+			}
+
+
+			pageobj.setPageText(text);
+			pageobj.setEditSummary(editsummary);
 			pageobj.setWatchlist(params.watch);
 			if (params.scribunto) {
 				pageobj.setCreateOption('recreate'); // Module /doc might not exist
@@ -1674,8 +1688,8 @@ Twinkle.speedy.callbacks = {
 			}
 			appendText += ' ~~~~~\n';
 
-			usl.log(appendText, editsummary + Twinkle.getPref('summaryAd'));
-
+			usl.changeTags = Twinkle.changeTags;
+			usl.log(appendText, editsummary);
 		}
 	}
 };
@@ -1795,6 +1809,12 @@ Twinkle.speedy.getParameters = function twinklespeedyGetParameters(form, values)
 				}
 				break;
 
+			case 'templatecat':  // G8
+				if (form['csd.templatecat_rationale'] && form['csd.templatecat_rationale'].value) {
+					currentParams.rationale = form['csd.templatecat_rationale'].value;
+				}
+				break;
+
 			case 'attack':  // G10
 				currentParams.blanked = 'yes';
 				// it is actually blanked elsewhere in code, but setting the flag here
@@ -1813,24 +1833,7 @@ Twinkle.speedy.getParameters = function twinklespeedyGetParameters(form, values)
 				break;
 
 			case 'afc':  // G13
-				var query = {
-						action: 'query',
-						titles: mw.config.get('wgPageName'),
-						prop: 'revisions',
-						rvprop: 'timestamp'
-					},
-					api = new Morebits.wiki.api('Grabbing the last revision timestamp', query, function(apiobj) {
-						var xmlDoc = apiobj.getXML(),
-							isoDateString = $(xmlDoc).find('rev').attr('timestamp');
-
-						currentParams.ts = isoDateString;
-					});
-
-				// Wait for API call to finish
-				api.post({
-					async: false
-				});
-
+				currentParams.ts = '$TIMESTAMP'; // to be replaced by the last revision timestamp when page is saved
 				break;
 
 			case 'redundantimage':  // F1
@@ -1905,12 +1908,6 @@ Twinkle.speedy.getParameters = function twinklespeedyGetParameters(form, values)
 						return false;
 					}
 					currentParams.article = duptitle;
-				}
-				break;
-
-			case 'policy':  // T2
-				if (form['csd.policy_rationale'] && form['csd.policy_rationale'].value) {
-					currentParams.rationale = form['csd.policy_rationale'].value;
 				}
 				break;
 
@@ -2177,9 +2174,12 @@ Twinkle.speedy.callback.evaluateUser = function twinklespeedyCallbackEvaluateUse
 	// Modules can't be tagged, follow standard at TfD and place on /doc subpage
 	params.scribunto = mw.config.get('wgPageContentModel') === 'Scribunto';
 	var wikipedia_page = params.scribunto ? new Morebits.wiki.page(mw.config.get('wgPageName') + '/doc', 'Tagging module documentation page') : new Morebits.wiki.page(mw.config.get('wgPageName'), 'Tagging page');
+	wikipedia_page.setChangeTags(Twinkle.changeTags); // Here to apply to triage
 	wikipedia_page.setCallbackParameters(params);
 	wikipedia_page.load(Twinkle.speedy.callbacks.user.main);
 };
+
+Twinkle.addInitCallback(Twinkle.speedy, 'speedy');
 })(jQuery);
 
 

@@ -3,7 +3,7 @@
 
 (function($) {
 
-var relevantUserName;
+var api = new mw.Api(), relevantUserName;
 var menuFormattedNamespaces = $.extend({}, mw.config.get('wgFormattedNamespaces'));
 menuFormattedNamespaces[0] = '(Article)';
 
@@ -97,7 +97,6 @@ Twinkle.block.callback = function twinkleblockCallback() {
 };
 
 Twinkle.block.fetchUserInfo = function twinkleblockFetchUserInfo(fn) {
-	var api = new mw.Api();
 	api.get({
 		format: 'json',
 		action: 'query',
@@ -106,6 +105,7 @@ Twinkle.block.fetchUserInfo = function twinkleblockFetchUserInfo(fn) {
 		lelimit: 1,
 		bkusers: mw.config.get('wgRelevantUserName'),
 		ususers: mw.config.get('wgRelevantUserName'),
+		usprop: 'groupmemberships',
 		letitle: 'User:' + mw.config.get('wgRelevantUserName')
 	})
 		.then(function(data) {
@@ -113,7 +113,15 @@ Twinkle.block.fetchUserInfo = function twinkleblockFetchUserInfo(fn) {
 				userinfo = data.query.users[0];
 
 			Twinkle.block.isRegistered = !!userinfo.userid;
-			relevantUserName = Twinkle.block.isRegistered ? 'User:' + mw.config.get('wgRelevantUserName') : mw.config.get('wgRelevantUserName');
+			if (Twinkle.block.isRegistered) {
+				relevantUserName = 'User:' + mw.config.get('wgRelevantUserName');
+				Twinkle.block.userIsBot = !!userinfo.groupmemberships && userinfo.groupmemberships.map(function(e) {
+					return e.group;
+				}).indexOf('bot') !== -1;
+			} else {
+				relevantUserName = mw.config.get('wgRelevantUserName');
+				Twinkle.block.userIsBot = false;
+			}
 
 			if (blockinfo) {
 			// handle frustrating system of inverted boolean values
@@ -123,6 +131,8 @@ Twinkle.block.fetchUserInfo = function twinkleblockFetchUserInfo(fn) {
 			}
 
 			Twinkle.block.hasBlockLog = !!data.query.logevents.length;
+			// Used later to check if block status changed while filling out the form
+			Twinkle.block.blockLogId = Twinkle.block.hasBlockLog ? data.query.logevents[0].logid : false;
 
 			if (typeof fn === 'function') {
 				return fn();
@@ -492,8 +502,6 @@ Twinkle.block.callback.change_action = function twinkleblockCallbackChangeAction
 		});
 
 		mw.util.addCSS(
-			// prevent dropdown from appearing behind the dialog, just in case
-			'.select2-container { z-index: 10000; }' +
 			// Reduce padding
 			'.select2-results .select2-results__option { padding-top: 1px; padding-bottom: 1px; }' +
 			// Adjust font size
@@ -543,7 +551,8 @@ Twinkle.block.callback.change_action = function twinkleblockCallbackChangeAction
 		}
 		Morebits.status.warn(statusStr, infoStr);
 		Twinkle.block.callback.update_form(e, Twinkle.block.currentBlockInfo);
-	} else if (templateBox) {
+	}
+	if (templateBox) {
 		// make sure all the fields are correct based on defaults
 		if (blockBox) {
 			Twinkle.block.callback.change_preset(e);
@@ -764,6 +773,14 @@ Twinkle.block.blockPresetsInfo = {
 		forRegisteredOnly: true,
 		reason: '{{uw-botublock}} <!-- Username implies a bot, soft block -->',
 		summary: 'You have been indefinitely blocked from editing because your [[WP:U|username]] indicates this is a [[WP:BOT|bot]] account, which is currently not approved'
+	},
+	'uw-botuhblock': {
+		autoblock: true,
+		expiry: 'infinity',
+		forRegisteredOnly: true,
+		nocreate: true,
+		reason: '{{uw-botuhblock}} <!-- Username implies a bot, hard block -->',
+		summary: 'You have been indefinitely blocked from editing because your username is a blatant violation of the [[WP:U|username policy]].'
 	},
 	'uw-causeblock': {
 		expiry: 'infinity',
@@ -1074,8 +1091,7 @@ Twinkle.block.transformBlockPresets = function twinkleblockTransformBlockPresets
 	$.each(Twinkle.block.blockPresetsInfo, function(preset, settings) {
 		settings.summary = settings.summary || settings.reason;
 		settings.sig = settings.sig !== undefined ? settings.sig : 'yes';
-		// despite this it's preferred that you use 'infinity' as the value for expiry
-		settings.indefinite = settings.indefinite || settings.expiry === 'infinity' || settings.expiry === 'infinite' || settings.expiry === 'indefinite' || settings.expiry === 'never';
+		settings.indefinite = settings.indefinite || Morebits.string.isInfinity(settings.expiry);
 
 		if (!Twinkle.block.isRegistered && settings.indefinite) {
 			settings.expiry = '31 hours';
@@ -1138,7 +1154,8 @@ Twinkle.block.blockGroups = [
 	{
 		label: 'Username violations',
 		list: [
-			{ label: 'Bot username', value: 'uw-botublock' },
+			{ label: 'Bot username, soft block', value: 'uw-botublock' },
+			{ label: 'Bot username, hard block', value: 'uw-botuhblock' },
 			{ label: 'Promotional username, hard block', value: 'uw-spamublock' },
 			{ label: 'Promotional username, soft block', value: 'uw-softerblock' },
 			{ label: 'Similar username soft block', value: 'uw-ublock-double' },
@@ -1292,11 +1309,11 @@ Twinkle.block.callback.update_form = function twinkleblockCallbackUpdateForm(e, 
 	data.hardblock = data.hardblock !== undefined ? data.hardblock : false;
 
 	// disable autoblock if blocking a bot
-	if (Twinkle.block.isRegistered && relevantUserName.search(/bot\b/i) > 0) {
+	if (Twinkle.block.userIsBot || /bot\b/i.test(relevantUserName)) {
 		data.autoblock = false;
 	}
 
-	$(form.field_block_options).find(':checkbox').each(function(i, el) {
+	$(form).find('[name=field_block_options]').find(':checkbox').each(function(i, el) {
 		// don't override original options if useInitialOptions is set
 		if (data.useInitialOptions && data[el.name] === undefined) {
 			return;
@@ -1321,7 +1338,7 @@ Twinkle.block.callback.change_template = function twinkleblockcallbackChangeTemp
 				Twinkle.block.prev_template_expiry = form.template_expiry.value || '';
 			}
 			form.template_expiry.parentNode.style.display = 'none';
-			form.template_expiry.value = 'indefinite';
+			form.template_expiry.value = 'infinity';
 		} else if (form.template_expiry.parentNode.style.display === 'none') {
 			if (Twinkle.block.prev_template_expiry !== null) {
 				form.template_expiry.value = Twinkle.block.prev_template_expiry;
@@ -1350,9 +1367,6 @@ Twinkle.block.callback.change_template = function twinkleblockcallbackChangeTemp
 	form.root.previewer.closePreview();
 };
 Twinkle.block.prev_template_expiry = null;
-Twinkle.block.prev_block_reason = null;
-Twinkle.block.prev_article = null;
-Twinkle.block.prev_reason = null;
 
 Twinkle.block.callback.preview = function twinkleblockcallbackPreview(form) {
 	var params = {
@@ -1361,7 +1375,7 @@ Twinkle.block.callback.preview = function twinkleblockcallbackPreview(form) {
 		disabletalk: form.disabletalk.checked || (form.notalk ? form.notalk.checked : false),
 		expiry: form.template_expiry ? form.template_expiry.value : form.expiry.value,
 		hardblock: Twinkle.block.isRegistered ? form.autoblock.checked : form.hardblock.checked,
-		indefinite: (/indef|infinit|never|\*|max/).test(form.template_expiry ? form.template_expiry.value : form.expiry.value),
+		indefinite: Morebits.string.isInfinity(form.template_expiry ? form.template_expiry.value : form.expiry.value),
 		reason: form.block_reason.value,
 		template: form.template.value,
 		partial: $(form).find('[name=actiontype][value=partial]').is(':checked'),
@@ -1416,13 +1430,17 @@ Twinkle.block.callback.evaluate = function twinkleblockCallbackEvaluate(e) {
 			if (!blockoptions.namespacerestrictions && !blockoptions.pagerestrictions) {
 				if (!blockoptions.noemail && !blockoptions.nocreate) { // Blank entries technically allowed [[phab:T208645]]
 					return alert('No pages or namespaces were selected, nor were email or account creation restrictions applied; please select at least one option to apply a partial block!');
-				} else if (!confirm('You are about to block with no restrictions on page or namespace editing, are you sure you want to proceed?')) {
+				} else if ((templateoptions.template !== 'uw-epblock' || $form.find('select[name="preset"]').val() !== 'uw-epblock') &&
+					// Don't require confirmation if email harassment defaults are set
+					!confirm('You are about to block with no restrictions on page or namespace editing, are you sure you want to proceed?')) {
 					return;
 				}
 			}
 		}
 		if (!blockoptions.expiry) {
 			return alert('Please provide an expiry!');
+		} else if (Morebits.string.isInfinity(blockoptions.expiry) && !Twinkle.block.isRegistered) {
+			return alert("Can't indefinitely block an IP address!");
 		}
 		if (!blockoptions.reason) {
 			return alert('Please provide a reason for the block!');
@@ -1438,15 +1456,85 @@ Twinkle.block.callback.evaluate = function twinkleblockCallbackEvaluate(e) {
 		blockoptions.anononly = blockoptions.hardblock ? undefined : true;
 		blockoptions.allowusertalk = blockoptions.disabletalk ? undefined : true;
 
-		// execute block
-		blockoptions.token = mw.user.tokens.get('csrfToken');
-		var mbApi = new Morebits.wiki.api('Executing block', blockoptions, function() {
-			statusElement.info('Completed');
-			if (toWarn) {
-				Twinkle.block.callback.issue_template(templateoptions);
+		/*
+		  Check if block status changed while processing the form.
+
+		  There's a lot to consider here. list=blocks provides the
+		  current block status, but there are at least two issues with
+		  relying on it. First, the id doesn't update on a reblock,
+		  meaning the individual parameters need to be compared. This
+		  can be done roughly with JSON.stringify - we can thankfully
+		  rely on order from the server, although sorting would be
+		  fine if not - but falsey values are problematic and is
+		  non-ideal. More importantly, list=blocks won't indicate if a
+		  non-blocked user is blocked then unblocked. This should be
+		  exceedingy rare, but regardless, we thus need to check
+		  list=logevents, which has a nicely updating logid
+		  parameter. We can't rely just on that, though, since it
+		  doesn't account for blocks that have expired on their own.
+
+		  As such, we use both. Using some ternaries, the logid
+		  variables are false if there's no logevents, so if they
+		  aren't equal we defintely have a changed entry (send
+		  confirmation). If they are equal, then either the user was
+		  never blocked (the block statuses will be equal, no
+		  confirmation) or there's no new block, in which case either
+		  a block expired (different statuses, confirmation) or the
+		  same block is still active (same status, no confirmation).
+		*/
+		api.get({
+			format: 'json',
+			action: 'query',
+			list: 'blocks|logevents',
+			letype: 'block',
+			lelimit: 1,
+			letitle: 'User:' + blockoptions.user,
+			bkusers: blockoptions.user
+		}).then(function(data) {
+			var block = data.query.blocks[0];
+			var logevents = data.query.logevents[0];
+			var logid = data.query.logevents.length ? logevents.logid : false;
+
+			if (logid !== Twinkle.block.blockLogId || !!block !== !!Twinkle.block.currentBlockInfo) {
+				var message = 'The block status of ' + mw.config.get('wgRelevantUserName') + ' has changed. ';
+				if (block) {
+					message += 'New status: ';
+				} else {
+					message += 'Last entry: ';
+				}
+
+				var logExpiry = '';
+				if (logevents.params.duration) {
+					if (logevents.params.duration === 'infinity') {
+						logExpiry = 'indefinitely';
+					} else {
+						var expiryDate = new Morebits.date(logevents.params.expiry);
+						logExpiry += (expiryDate.isBefore(new Date()) ? ', expired ' : ' until ') + expiryDate.calendar();
+					}
+				} else { // no duration, action=unblock, just show timestamp
+					logExpiry = ' ' + new Morebits.date(logevents.timestamp).calendar();
+				}
+				message += Morebits.string.toUpperCaseFirstChar(logevents.action) + 'ed by ' + logevents.user + logExpiry +
+					' for "' + logevents.comment + '". Do you want to override with your settings?';
+
+				if (!confirm(message)) {
+					Morebits.status.info('Executing block', 'Canceled by user');
+					return;
+				}
+				blockoptions.reblock = 1; // Writing over a block will fail otherwise
 			}
+
+			// execute block
+			blockoptions.tags = Twinkle.changeTags;
+			blockoptions.token = mw.user.tokens.get('csrfToken');
+			var mbApi = new Morebits.wiki.api('Executing block', blockoptions, function() {
+				statusElement.info('Completed');
+				if (toWarn) {
+					Twinkle.block.callback.issue_template(templateoptions);
+				}
+			});
+			mbApi.post();
 		});
-		mbApi.post();
 	} else if (toWarn) {
 		Morebits.simpleWindow.setButtonsEnabled(false);
 
@@ -1473,7 +1561,6 @@ Twinkle.block.callback.issue_template = function twinkleblockCallbackIssueTempla
 
 	var wikipedia_page = new Morebits.wiki.page(userTalkPage, 'User talk page modification');
 	wikipedia_page.setCallbackParameters(params);
-	wikipedia_page.setFollowRedirect(true);
 	wikipedia_page.load(Twinkle.block.callback.main);
 };
 
@@ -1570,7 +1657,7 @@ Twinkle.block.callback.main = function twinkleblockcallbackMain(pageobj) {
 		text += '\n\n';
 	}
 
-	params.indefinite = (/indef|infinit|never|\*|max/).test(params.expiry);
+	params.indefinite = Morebits.string.isInfinity(params.expiry);
 
 	if (Twinkle.getPref('blankTalkpageOnIndefBlock') && params.template !== 'uw-lblock' && params.indefinite) {
 		Morebits.status.info('Info', 'Blanking talk page per preferences and creating a new level 2 heading for the date');
@@ -1589,14 +1676,16 @@ Twinkle.block.callback.main = function twinkleblockcallbackMain(pageobj) {
 	if (messageData.suppressArticleInSummary !== true && params.article) {
 		summary += ' on [[:' + params.article + ']]';
 	}
-	summary += '.' + Twinkle.getPref('summaryAd');
+	summary += '.';
 
 	pageobj.setPageText(text);
 	pageobj.setEditSummary(summary);
+	pageobj.setChangeTags(Twinkle.changeTags);
 	pageobj.setWatchlist(Twinkle.getPref('watchWarnings'));
 	pageobj.save();
 };
 
+Twinkle.addInitCallback(Twinkle.block, 'block');
 })(jQuery);
 
 

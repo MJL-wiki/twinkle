@@ -8,9 +8,9 @@
  ****************************************
  *** twinkleconfig.js: Preferences module
  ****************************************
- * Mode of invocation:     Adds configuration form to Wikipedia:Twinkle/Preferences and user
-                           subpages named "/Twinkle preferences", and adds an ad box to the top of user
-                           subpages belonging to the currently logged-in user which end in '.js'
+ * Mode of invocation:     Adds configuration form to Wikipedia:Twinkle/Preferences,
+                           and adds an ad box to the top of user subpages belonging to the
+                           currently logged-in user which end in '.js'
  * Active on:              What I just said.  Yeah.
 
  I, [[User:This, that and the other]], originally wrote this.  If the code is misbehaving, or you have any
@@ -31,7 +31,7 @@ Twinkle.config.commonSets = {
 		u1: 'U1', u2: 'U2', u3: 'U3', u5: 'U5',
 		f1: 'F1', f2: 'F2', f3: 'F3', f7: 'F7', f8: 'F8', f9: 'F9', f10: 'F10',
 		c1: 'C1',
-		t2: 'T2', t3: 'T3',
+		t3: 'T3',
 		r2: 'R2', r3: 'R3', r4: 'R4',
 		p1: 'P1', p2: 'P2'
 	},
@@ -42,7 +42,7 @@ Twinkle.config.commonSets = {
 		'u1', 'u2', 'u3', 'u5',
 		'f1', 'f2', 'f3', 'f7', 'f8', 'f9', 'f10',
 		'c1',
-		't2', 't3',
+		't3',
 		'r2', 'r3', 'r4',
 		'p1', 'p2'
 	],
@@ -54,7 +54,7 @@ Twinkle.config.commonSets = {
 		u3: 'U3', u5: 'U5',
 		f1: 'F1', f2: 'F2', f3: 'F3', f7: 'F7', f9: 'F9', f10: 'F10',
 		c1: 'C1',
-		t2: 'T2', t3: 'T3',
+		t3: 'T3',
 		r2: 'R2', r3: 'R3', r4: 'R4',
 		p1: 'P1', p2: 'P2'
 	},
@@ -65,7 +65,7 @@ Twinkle.config.commonSets = {
 		'u3', 'u5',
 		'f1', 'f2', 'f3', 'f7', 'f9', 'f10',
 		'c1',
-		't2', 't3',
+		't3',
 		'r2', 'r3', 'r4',
 		'p1', 'p2'
 	],
@@ -76,7 +76,7 @@ Twinkle.config.commonSets = {
 		u1: 'U1', u2: 'U2', u3: 'U3', u5: 'U5',
 		f1: 'F1', f2: 'F2', f3: 'F3', f4: 'F4', f5: 'F5', f6: 'F6', f7: 'F7', f8: 'F8', f9: 'F9', f10: 'F10', f11: 'F11',
 		c1: 'C1',
-		t2: 'T2', t3: 'T3',
+		t3: 'T3',
 		r2: 'R2', r3: 'R3', r4: 'R4',
 		p1: 'P1', p2: 'P2'
 	},
@@ -87,7 +87,7 @@ Twinkle.config.commonSets = {
 		'u1', 'u2', 'u3', 'u5',
 		'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11',
 		'c1',
-		't2', 't3',
+		't3',
 		'r2', 'r3', 'r4',
 		'p1', 'p2'
 	],
@@ -152,35 +152,6 @@ Twinkle.config.sections = [
 	{
 		title: 'General',
 		preferences: [
-			// TwinkleConfig.summaryAd (string)
-			// Text to be appended to the edit summary of edits made using Twinkle
-			{
-				name: 'summaryAd',
-				label: "\"Ad\" to be appended to Twinkle's edit summaries",
-				helptip: 'The summary ad should start with a space, and be kept short.',
-				type: 'string'
-			},
-
-			// TwinkleConfig.deletionSummaryAd (string)
-			// Text to be appended to the edit summary of deletions made using Twinkle
-			{
-				name: 'deletionSummaryAd',
-				label: 'Summary ad to use for deletion summaries',
-				helptip: 'Normally the same as the edit summary ad above.',
-				adminOnly: true,
-				type: 'string'
-			},
-
-			// TwinkleConfig.protectionSummaryAd (string)
-			// Text to be appended to the edit summary of page protections made using Twinkle
-			{
-				name: 'protectionSummaryAd',
-				label: 'Summary ad to use for page protections',
-				helptip: 'Normally the same as the edit summary ad above.',
-				adminOnly: true,
-				type: 'string'
-			},
-
 			// TwinkleConfig.userTalkPageMode may take arguments:
 			// 'window': open a new window, remember the opened window
 			// 'tab': opens in a new tab, if possible.
@@ -347,15 +318,24 @@ Twinkle.config.sections = [
 				name: 'openTalkPage',
 				label: 'Open user talk page after these types of reversions',
 				type: 'set',
-				setValues: { agf: 'AGF rollback', norm: 'Normal rollback', vand: 'Vandalism rollback', torev: '"Restore this version"' }
+				setValues: { agf: 'AGF rollback', norm: 'Normal rollback', vand: 'Vandalism rollback' }
 			},
 
 			// TwinkleConfig.openTalkPageOnAutoRevert (bool)
-			// Defines if talk page should be opened when calling revert from contrib page, because from there, actions may be multiple, and opening talk page not suitable. If set to true, openTalkPage defines then if talk page will be opened.
+			// Defines if talk page should be opened when calling revert from contribs or recent changes pages. If set to true, openTalkPage defines then if talk page will be opened.
 			{
 				name: 'openTalkPageOnAutoRevert',
-				label: 'Open user talk page when invoking rollback from user contributions',
-				helptip: "Often, you may be rolling back many pages at a time from a vandal's contributions page, so it would be unsuitable to open the user talk page. Hence, this option is off by default. When this is on, the desired options must be enabled in the previous setting for this to work.",
+				label: 'Open user talk page when invoking rollback from user contributions or recent changes',
+				helptip: 'When this is on, the desired options must be enabled in the previous setting for this to work.',
+				type: 'boolean'
+			},
+
+			// TwinkleConfig.rollbackInPlace (bool)
+			//
+			{
+				name: 'rollbackInPlace',
+				label: "Don't reload the page when rolling back from contributions or recent changes",
+				helptip: "When this is on, Twinkle won't reload the contributions or recent changes feed after reverting, allowing you to revert more than one edit at a time.",
 				type: 'boolean'
 			},
 
@@ -394,13 +374,14 @@ Twinkle.config.sections = [
 			},
 
 			// TwinkleConfig.showRollbackLinks (array)
-			// Where Twinkle should show rollback links (diff, others, mine, contribs)
+			// Where Twinkle should show rollback links:
+			// diff, others, mine, contribs, history, recent
 			// Note from TTO: |contribs| seems to be equal to |others| + |mine|, i.e. redundant, so I left it out heres
 			{
 				name: 'showRollbackLinks',
 				label: 'Show rollback links on these pages',
 				type: 'set',
-				setValues: { diff: 'Diff pages', others: 'Contributions pages of other users', mine: 'My contributions page' }
+				setValues: { diff: 'Diff pages', others: 'Contributions pages of other users', mine: 'My contributions page', recent: 'Recent changes and related changes special pages', history: 'History pages' }
 			}
 		]
 	},
@@ -682,7 +663,8 @@ Twinkle.config.sections = [
 					'7': 'Single-issue warnings',
 					// 8 was used for block templates before #260
 					'9': 'Custom warnings',
-					'10': 'All warning templates'
+					'10': 'All warning templates',
+					'11': 'Auto-select level (1-4)'
 				}
 			},
 
@@ -785,6 +767,25 @@ Twinkle.config.sections = [
 	{
 		title: 'XFD (deletion discussions)',
 		preferences: [
+			{
+				name: 'logXfdNominations',
+				label: 'Keep a log in userspace of all pages you nominate for a deletion discussion (XfD)',
+				helptip: 'The userspace log offers a good way to keep track of all pages you nominate for XfD using Twinkle.',
+				type: 'boolean'
+			},
+			{
+				name: 'xfdLogPageName',
+				label: 'Keep the deletion discussion userspace log at this user subpage',
+				helptip: 'Enter a subpage name in this box. You will find your XfD log at User:<i>username</i>/<i>subpage name</i>. Only works if you turn on the XfD userspace log.',
+				type: 'string'
+			},
+			{
+				name: 'noLogOnXfdNomination',
+				label: 'Do not create a userspace log entry when nominating at this venue',
+				type: 'set',
+				setValues: { afd: 'AfD', tfd: 'TfD', ffd: 'FfD', cfd: 'CfD', cfds: 'CfD/S', mfd: 'MfD', rfd: 'RfD', rm: 'RM' }
+			},
+
 			// TwinkleConfig.xfdWatchPage (string)
 			// The watchlist setting of the page being nominated for XfD. Either "yes" (add to watchlist), "no" (don't
 			// add to watchlist), or "default" (use setting from preferences). Default is "default" (duh).
@@ -878,33 +879,22 @@ Twinkle.config.sections = [
 				name: 'revertMaxRevisions',
 				type: 'integer'
 			},
-			// twinklebatchdelete.js: How many pages should be processed maximum
+			// twinklewarn.js: When using the autolevel select option, how many days makes a prior warning stale
+			// Huggle is three days ([[Special:Diff/918980316]] and [[Special:Diff/919417999]]) while ClueBotNG is two:
+			// https://github.com/DamianZaremba/cluebotng/blob/4958e25d6874cba01c75f11debd2e511fd5a2ce5/bot/action_functions.php#L62
+			{
+				name: 'autolevelStaleDays',
+				type: 'integer'
+			},
+			// How many pages should be queried by deprod and batchdelete/protect/undelete
 			{
 				name: 'batchMax',
 				type: 'integer',
 				adminOnly: true
 			},
-			// twinklebatchdelete.js: How many pages should be processed at a time
+			// How many pages should be processed at a time by deprod and batchdelete/protect/undelete
 			{
-				name: 'batchdeleteChunks',
-				type: 'integer',
-				adminOnly: true
-			},
-			// twinklebatchprotect.js: How many pages should be processed at a time
-			{
-				name: 'batchProtectChunks',
-				type: 'integer',
-				adminOnly: true
-			},
-			// twinklebatchundelete.js: How many pages should be processed at a time
-			{
-				name: 'batchundeleteChunks',
-				type: 'integer',
-				adminOnly: true
-			},
-			// twinkledeprod.js: How many pages should be processed at a time
-			{
-				name: 'proddeleteChunks',
+				name: 'batchChunks',
 				type: 'integer',
 				adminOnly: true
 			}
@@ -916,10 +906,9 @@ Twinkle.config.sections = [
 
 Twinkle.config.init = function twinkleconfigInit() {
 
-	if (((mw.config.get('wgNamespaceNumber') === mw.config.get('wgNamespaceIds').project && mw.config.get('wgTitle') === 'Twinkle/Preferences') ||
-			(mw.config.get('wgNamespaceNumber') === mw.config.get('wgNamespaceIds').user && mw.config.get('wgTitle').lastIndexOf('/Twinkle preferences') === (mw.config.get('wgTitle').length - 20))) &&
+	// create the config page at Wikipedia:Twinkle/Preferences
+	if ((mw.config.get('wgNamespaceNumber') === mw.config.get('wgNamespaceIds').project && mw.config.get('wgTitle') === 'Twinkle/Preferences') &&
 			mw.config.get('wgAction') === 'view') {
-		// create the config page at Wikipedia:Twinkle/Preferences, and at user subpages (for testing purposes)
 
 		if (!document.getElementById('twinkle-config')) {
 			return;  // maybe the page is misconfigured, or something - but any attempt to modify it will be pointless
@@ -1674,7 +1663,8 @@ Twinkle.config.writePrefs = function twinkleconfigWritePrefs(pageobj) {
 		'// End of twinkleoptions.js\n';
 
 	pageobj.setPageText(text);
-	pageobj.setEditSummary('Saving Twinkle preferences: automatic edit from [[:' + Morebits.pageNameNorm + ']] ([[WP:TW|TW]])');
+	pageobj.setEditSummary('Saving Twinkle preferences: automatic edit from [[:' + Morebits.pageNameNorm + ']]');
+	pageobj.setChangeTags(Twinkle.changeTags);
 	pageobj.setCreateOption('recreate');
 	pageobj.save(Twinkle.config.saveSuccess);
 };
@@ -1692,6 +1682,8 @@ Twinkle.config.saveSuccess = function twinkleconfigSaveSuccess(pageobj) {
 	noticeclear.style.clear = 'both';
 	Morebits.status.root.appendChild(noticeclear);
 };
+
+Twinkle.addInitCallback(Twinkle.config.init);
 })(jQuery);
 
 

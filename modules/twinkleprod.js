@@ -64,6 +64,12 @@ Twinkle.prod.callback = function twinkleprodCallback() {
 	});
 
 	field.append({
+		type: 'div',
+		label: Twinkle.makeFindSourcesDiv(),
+		style: 'margin-bottom: 5px;'
+	});
+
+	field.append({
 		type: 'radio',
 		name: 'prodtype',
 		event: Twinkle.prod.callback.prodtypechanged,
@@ -185,17 +191,7 @@ Twinkle.prod.callbacks = {
 		if (numTemplates) {
 			var template = $(xmlDoc).find('templates tl')[0].getAttribute('title');
 			if (numTemplates === 1 && template === 'Template:Old prod') {
-				if (params.blp) {
-					if (!confirm('Previous PROD nomination found on talk page. Do you still want to continue applying BLPPROD? ')) {
-						statelem.warn('Previous PROD found on talk page, aborted by user');
-						return;
-					}
-					statelem.info('Previous PROD found on talk page, continuing');
-				} else {
-					statelem.warn('Previous PROD found on talk page, aborting procedure');
-					return;
-				}
-
+				params.oldProdPresent = true; // Mark for reference later, when deciding if to endorse
 			// if there are multiple templates, at least one of them would be a prior xfd template
 			} else {
 				statelem.warn('Previous XfD template found on talk page, aborting procedure');
@@ -220,6 +216,7 @@ Twinkle.prod.callbacks = {
 
 		var wikipedia_page = new Morebits.wiki.page(mw.config.get('wgPageName'), 'Tagging page');
 		wikipedia_page.setFollowRedirect(true);  // for NPP, and also because redirects are ineligible for PROD
+		wikipedia_page.setChangeTags(Twinkle.changeTags);  // Here to apply to triage
 		wikipedia_page.setCallbackParameters(params);
 		wikipedia_page.load(Twinkle.prod.callbacks.main);
 	},
@@ -236,28 +233,45 @@ Twinkle.prod.callbacks = {
 		var params = pageobj.getCallbackParameters();
 
 		// Check for already existing deletion tags
-		var tag_re = /{{(?:db-?|delete|article for deletion\/dated|ffd\b)|#invoke:RfD/i;
+		var tag_re = /{{(?:db-?|delete|article for deletion\/dated|AfDM|ffd\b)|#invoke:RfD/i;
 		if (tag_re.test(text)) {
 			statelem.warn('Page already tagged with a deletion template, aborting procedure');
 			return;
 		}
 
-		// Alert if article is at least three days old, not in Category:Living people, and BLPPROD is selected
-		if (params.blp) {
-			var isMoreThan3DaysOld = new Morebits.date(params.creation).add(3, 'days').isAfter(new Date(pageobj.getLoadTime()));
-			var blpcheck_re = /\[\[Category:Living people\]\]/i;
-			if (!blpcheck_re.test(text) && isMoreThan3DaysOld) {
-				if (!confirm('Please note that the article is not in Category:Living people and hence may be ineligible for BLPPROD. Are you sure you want to continue? \n\nYou may wish to add the category if you proceed, unless the article is about a recently deceased person.')) {
-					return;
-				}
-			}
-		}
 
 		// Remove tags that become superfluous with this action
 		text = text.replace(/{{\s*(userspace draft|mtc|(copy|move) to wikimedia commons|(copy |move )?to ?commons)\s*(\|(?:{{[^{}]*}}|[^{}])*)?}}\s*/gi, '');
 		var prod_re = /{{\s*(?:Prod blp|Proposed deletion|book-prod)\/dated(?: files)?\s*\|(?:{{[^{}]*}}|[^{}])*}}/i;
 		var summaryText;
+
 		if (!prod_re.test(text)) {
+
+			// Page previously PROD-ed
+			if (params.oldProdPresent) {
+				if (params.blp) {
+					if (!confirm('Previous PROD nomination found on talk page. Do you still want to continue applying BLPPROD? ')) {
+						statelem.warn('Previous PROD found on talk page, aborted by user');
+						return;
+					}
+					statelem.info('Previous PROD found on talk page, continuing');
+				} else {
+					statelem.warn('Previous PROD found on talk page, aborting procedure');
+					return;
+				}
+			}
+
+			// Alert if article is at least three days old, not in Category:Living people, and BLPPROD is selected
+			if (params.blp) {
+				var isMoreThan3DaysOld = new Morebits.date(params.creation).add(3, 'days').isAfter(new Date(pageobj.getLoadTime()));
+				var blpcheck_re = /\[\[Category:Living people\]\]/i;
+				if (!blpcheck_re.test(text) && isMoreThan3DaysOld) {
+					if (!confirm('Please note that the article is not in Category:Living people and hence may be ineligible for BLPPROD. Are you sure you want to continue? \n\nYou may wish to add the category if you proceed, unless the article is about a recently deceased person.')) {
+						return;
+					}
+				}
+			}
+
 			// Notification to first contributor
 			if (params.usertalk) {
 				// Disallow warning yourself
@@ -280,9 +294,10 @@ Twinkle.prod.callbacks = {
 
 					var usertalkpage = new Morebits.wiki.page('User talk:' + params.initialContrib, 'Notifying initial contributor (' + params.initialContrib + ')');
 					usertalkpage.setAppendText(notifytext);
-					usertalkpage.setEditSummary('Notification: proposed deletion of [[:' + Morebits.pageNameNorm + ']].' + Twinkle.getPref('summaryAd'));
+					usertalkpage.setEditSummary('Notification: proposed deletion of [[:' + Morebits.pageNameNorm + ']].');
+					usertalkpage.setChangeTags(Twinkle.changeTags);
 					usertalkpage.setCreateOption('recreate');
-					usertalkpage.setFollowRedirect(true);
+					usertalkpage.setFollowRedirect(true, false);
 					usertalkpage.setCallbackParameters(params);
 					usertalkpage.append(function onNotifySuccess() {
 						// add nomination to the userspace log, if the user has enabled it
@@ -300,36 +315,43 @@ Twinkle.prod.callbacks = {
 			} else if (Twinkle.getPref('logProdPages')) { // If not notifying, log this PROD
 				Twinkle.prod.callbacks.addToLog(params);
 			}
+			var tag;
 			if (params.blp) {
 				summaryText = 'Proposing article for deletion per [[WP:BLPPROD]].';
-				text = '{{subst:prod blp' + (params.usertalk ? '|help=off' : '') + '}}\n' + text;
+				tag = '{{subst:prod blp' + (params.usertalk ? '|help=off' : '') + '}}';
 			} else if (params.book) {
 				summaryText = 'Proposing book for deletion per [[WP:BOOKPROD]].';
-				text = '{{subst:book-prod|1=' + Morebits.string.formatReasonText(params.reason) + (params.usertalk ? '|help=off' : '') + '}}\n' + text;
+				tag = '{{subst:book-prod|1=' + Morebits.string.formatReasonText(params.reason) + (params.usertalk ? '|help=off' : '') + '}}';
 			} else {
 				summaryText = 'Proposing ' + namespace + ' for deletion per [[WP:PROD]].';
-				text = '{{subst:prod|1=' + Morebits.string.formatReasonText(params.reason) + (params.usertalk ? '|help=off' : '') + '}}\n' + text;
+				tag = '{{subst:prod|1=' + Morebits.string.formatReasonText(params.reason) + (params.usertalk ? '|help=off' : '') + '}}';
 			}
 
+			// Insert tag after short description or any hatnotes
+			var wikipage = new Morebits.wikitext.page(text);
+			text = wikipage.insertAfterTemplates(tag + '\n', Twinkle.hatnoteRegex).getText();
+
 			// Add {{Old prod}} to the talk page
-			var oldprodfull = '{{Old prod|nom=' + mw.config.get('wgUserName') + '|nomdate={{subst:#time: Y-m-d}}}}\n';
-			var talktitle = new mw.Title(mw.config.get('wgPageName')).getTalkPage().getPrefixedText();
-			var talkpage = new Morebits.wiki.page(talktitle, 'Placing {{Old prod}} on talk page');
-			talkpage.setPrependText(oldprodfull);
-			talkpage.setEditSummary('Adding {{Old prod}}' + Twinkle.getPref('summaryAd'));
-			talkpage.setFollowRedirect(true);  // match behavior for page tagging
-			talkpage.setCreateOption('recreate');
-			talkpage.prepend();
+			if (!params.oldProdPresent) {
+				var oldprodfull = '{{Old prod|nom=' + mw.config.get('wgUserName') + '|nomdate={{subst:#time: Y-m-d}}}}\n';
+				var talktitle = new mw.Title(mw.config.get('wgPageName')).getTalkPage().getPrefixedText();
+				var talkpage = new Morebits.wiki.page(talktitle, 'Placing {{Old prod}} on talk page');
+				talkpage.setPrependText(oldprodfull);
+				talkpage.setEditSummary('Adding {{Old prod}}');
+				talkpage.setChangeTags(Twinkle.changeTags);
+				talkpage.setFollowRedirect(true);  // match behavior for page tagging
+				talkpage.setCreateOption('recreate');
+				talkpage.prepend();
+			}
 		} else {  // already tagged for PROD, so try endorsing it
-			var prod2_re = /{{(?:Proposed deletion endorsed|prod-?2).*?}}/;
+			var prod2_re = /{{(?:Proposed deletion endorsed|prod-?2).*?}}/i;
 			if (prod2_re.test(text)) {
 				statelem.warn('Page already tagged with {{proposed deletion}} and {{proposed deletion endorsed}} templates, aborting procedure');
 				return;
 			}
 			var confirmtext = 'A {{proposed deletion}} tag was already found on this page. \nWould you like to add a {{proposed deletion endorsed}} tag with your explanation?';
-			if (params.blp) {
+			if (params.blp && !/{{\s*Prod blp\/dated/.test(text)) {
 				confirmtext = 'A non-BLP {{proposed deletion}} tag was found on this article.\nWould you like to add a {{proposed deletion endorsed}} tag with explanation "article is a biography of a living person with no sources"?';
-				// FIXME: this msg is shown even if it was a BLPPROD tag.
 			}
 			if (!confirm(confirmtext)) {
 				statelem.warn('Aborted per user request');
@@ -337,7 +359,7 @@ Twinkle.prod.callbacks = {
 			}
 
 			summaryText = 'Endorsing proposed deletion per [[WP:' + (params.blp ? 'BLP' : params.book ? 'BOOK' : '') + 'PROD]].';
-			text = text.replace(prod_re, text.match(prod_re) + '\n{{proposed deletion endorsed|1=' + (params.blp ?
+			text = text.replace(prod_re, text.match(prod_re) + '\n{{Proposed deletion endorsed|1=' + (params.blp ?
 				'article is a [[WP:BLPPROD|biography of a living person with no sources]]' :
 				Morebits.string.formatReasonText(params.reason)) + '}}\n');
 
@@ -353,7 +375,7 @@ Twinkle.prod.callbacks = {
 		}
 
 		pageobj.setPageText(text);
-		pageobj.setEditSummary(summaryText + Twinkle.getPref('summaryAd'));
+		pageobj.setEditSummary(summaryText);
 		pageobj.setWatchlist(Twinkle.getPref('watchProdPages'));
 		pageobj.setCreateOption('nocreate');
 		pageobj.save();
@@ -382,38 +404,34 @@ Twinkle.prod.callbacks = {
 				logText += '; notified {{user|' + params.logInitialContrib + '}}';
 			}
 			logText += ' ~~~~~\n';
-			if (!params.blp) {
-				logText += "#* '''Reason''': " + params.reason + '\n';
+			if (!params.blp && params.reason) {
+				logText += "#* '''Reason''': " + Morebits.string.formatReasonForLog(params.reason) + '\n';
 			}
 			summaryText = 'Logging PROD nomination of [[:' + Morebits.pageNameNorm + ']].';
 		}
+		usl.changeTags = Twinkle.changeTags;
 
-		usl.log(logText, summaryText + Twinkle.getPref('summaryAd'));
-
+		usl.log(logText, summaryText);
 	}
 
 };
 
 Twinkle.prod.callback.evaluate = function twinkleprodCallbackEvaluate(e) {
 	var form = e.target;
-	var prodtype;
-
-	if (namespace === 'article') {
-		var prodtypes = form.prodtype;
-		for (var i = 0; i < prodtypes.length; i++) {
-			if (prodtypes[i].checked) {
-				prodtype = prodtypes[i].values;
-				break;
-			}
-		}
-	}
+	var input = Morebits.quickForm.getInputData(form);
 
 	var params = {
-		usertalk: form.notify.checked,
-		blp: prodtype === 'prodblp',
+		usertalk: input.notify || input.prodtype === 'prodblp',
+		blp: input.prodtype === 'prodblp',
 		book: namespace === 'book',
-		reason: prodtype === 'prodblp' ? '' : form.reason.value  // using an empty string here as fallback will help with prod-2.
+		reason: input.reason || '' // using an empty string here as fallback will help with prod-2.
 	};
+
+	if (!params.blp && !params.reason) {
+		if (!confirm('You left the reason blank, do you really want to continue without providing one?')) {
+			return;
+		}
+	}
 
 	Morebits.simpleWindow.setButtonsEnabled(false);
 	Morebits.status.init(form);
@@ -435,6 +453,8 @@ Twinkle.prod.callback.evaluate = function twinkleprodCallbackEvaluate(e) {
 	wikipedia_api.params = params;
 	wikipedia_api.post();
 };
+
+Twinkle.addInitCallback(Twinkle.prod, 'prod');
 })(jQuery);
 
 
